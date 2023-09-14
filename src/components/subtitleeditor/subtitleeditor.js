@@ -71,12 +71,51 @@ function deleteLocalSubtitle(context, index) {
     });
 }
 
+function editLocalSubtitleOffset(context, index) {
+    import('../../components/prompt/prompt').then(({ default: prompt }) => {
+        prompt({
+			title: globalize.translate('TitleNewOffset'),
+            label: globalize.translate('LabelNewOffset'),
+            //description: globalize.translate('MessageRenameMediaFolder'),
+            confirmText: globalize.translate('ButtonSetOffset')
+        }).then(function (newOffset) {
+			console.log("prompt closed: "+newOffset);
+            if (newOffset) {
+				console.log("show loading");
+				loading.show();
+				const apiClient = ServerConnections.getApiClient(currentItem.ServerId);
+				const itemId = currentItem.Id;
+				const url = 'Videos/' + itemId + '/Subtitles/' + index + '/Offset';
+				console.log("call server");
+				apiClient.ajax({
+		            type: 'POST',
+		            url: apiClient.getUrl(url),
+					data: "{\"offset\":\""+newOffset+"\"}",
+					contentType: 'application/json',
+                	//dataType: 'json'
+		        }).then(function () {
+					console.log("reloading");
+		            hasChanges = true;
+		            reload(context, apiClient, itemId);
+		        });
+				
+               //const refreshAfterChange = shouldRefreshLibraryAfterChanges(page);
+                //ApiClient.updateSubtitleOffset(itemId, index, newOffset).then(function () {
+                    //reloadLibrary(page);
+                //});
+            }
+        });
+    });
+}
+
 function fillSubtitleList(context, item) {
     const streams = item.MediaStreams || [];
 
     const subs = streams.filter(function (s) {
         return s.Type === 'Subtitle';
     });
+
+	console.log("subs: "+subs.length);
 
     let html = '';
 
@@ -117,6 +156,7 @@ function fillSubtitleList(context, item) {
             if (!layoutManager.tv) {
                 if (s.Path) {
                     itemHtml += '<button is="paper-icon-button-light" data-index="' + s.Index + '" title="' + globalize.translate('Delete') + '" class="btnDelete listItemButton"><span class="material-icons delete" aria-hidden="true"></span></button>';
+                    itemHtml += '<button is="paper-icon-button-light" data-index="' + s.Index + '" title="' + globalize.translate('Offset') + '" class="btnOffset listItemButton"><span class="material-icons more_time" aria-hidden="true"></span></button>';
                 }
             }
 
@@ -254,10 +294,10 @@ function searchForSubtitles(context, language) {
 
 function reload(context, apiClient, itemId) {
     context.querySelector('.noSearchResults').classList.add('hide');
-
+	console.log("reload: "+itemId);
     function onGetItem(item) {
         currentItem = item;
-
+		console.log("onGetItem");
         fillSubtitleList(context, item);
         let file = item.Path || '';
         const index = Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\'));
@@ -273,11 +313,13 @@ function reload(context, apiClient, itemId) {
             context.querySelector('.originalFile').classList.add('hide');
         }
 
+		console.log("hide loading");
         loading.hide();
     }
 
     if (typeof itemId === 'string') {
         apiClient.getItem(apiClient.getCurrentUserId(), itemId).then(onGetItem);
+		console.log("apiclient.getitem done");
     } else {
         onGetItem(itemId);
     }
@@ -295,11 +337,18 @@ function onSearchSubmit(e) {
 }
 
 function onSubtitleListClick(e) {
+	console.log("onSubtitleListClick");
     const btnDelete = dom.parentWithClass(e.target, 'btnDelete');
     if (btnDelete) {
         const index = btnDelete.getAttribute('data-index');
         const context = dom.parentWithClass(btnDelete, 'subtitleEditorDialog');
         deleteLocalSubtitle(context, index);
+    }
+	const btnOffset = dom.parentWithClass(e.target, 'btnOffset');
+    if (btnOffset) {
+        const index = btnOffset.getAttribute('data-index');
+        const context = dom.parentWithClass(btnOffset, 'subtitleEditorDialog');
+        editLocalSubtitleOffset(context, index);
     }
 }
 
